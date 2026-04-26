@@ -1,0 +1,24 @@
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terragrunt-cache/
+*.tfvars
+
+# Secrets - NEVER commit
+*.pem
+*.key
+.env
+.env.*
+secrets.tf
+secrets.yaml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

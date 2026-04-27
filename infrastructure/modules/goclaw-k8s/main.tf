@@ -117,6 +117,10 @@ resource "kubernetes_stateful_set_v1" "postgres" {
             name  = "POSTGRES_DB"
             value = "goclaw"
           }
+          env {
+            name  = "PGDATA"
+            value = "/var/lib/postgresql/data/pgdata"
+          }
           port {
             container_port = 5432
           }

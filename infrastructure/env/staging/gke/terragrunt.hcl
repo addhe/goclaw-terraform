@@ -1,13 +1,13 @@
 include "root" {
-  path = find_in_parent_folders()
+  path = "../../../terragrunt.hcl"
 }
 
 terraform {
-  source = "../../../../modules/gke"
+  source = "../../../modules/gke"
 }
 
 locals {
-  env = read_terragrunt_config("../../env.hcl").locals
+  env = read_terragrunt_config("../env.hcl").locals
 }
 
 inputs = {

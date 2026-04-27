@@ -22,3 +22,11 @@ variable "writer_members" {
   type = list(string)
   default = []
 }
+
+variable "region" {
+  type = string
+}
+
+variable "zone" {
+  type = string
+}

@@ -12,7 +12,7 @@ resource "google_storage_bucket" "bucket" {
   }
     action {
     type          = "SetStorageClass"
-    storage_class = "COLD"
+    storage_class = "COLDLINE"
   }
   }
   lifecycle_rule {

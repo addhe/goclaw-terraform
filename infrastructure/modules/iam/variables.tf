@@ -14,3 +14,11 @@ variable "backup_buckets" {
   type = set(string)
   default = []
 }
+
+variable "region" {
+  type = string
+}
+
+variable "zone" {
+  type = string
+}

@@ -75,3 +75,15 @@ variable "cloud_sql_connection_name" {
   type = string
   default = ""
 }
+
+variable "region" {
+  type = string
+}
+
+variable "zone" {
+  type = string
+}
+
+variable "project" {
+  type = string
+}

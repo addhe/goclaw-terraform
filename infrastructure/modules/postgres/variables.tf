@@ -42,3 +42,7 @@ variable "private_network" {
   type = string
   default = ""
 }
+
+variable "zone" {
+  type = string
+}

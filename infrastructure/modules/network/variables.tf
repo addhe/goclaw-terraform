@@ -35,3 +35,7 @@ variable "goclaw_port" {
   type = number
   default = 18790
 }
+
+variable "zone" {
+  type = string
+}

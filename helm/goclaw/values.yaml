@@ -1,0 +1,46 @@
+replicas: 1
+image:
+  repository: ""
+  tag: "3.11.2"
+  pullPolicy: IfNotPresent
+port: 18790
+
+nodeSelectors: {}
+tolerations: []
+
+postgres:
+  enabled: true
+  user: goclaw
+  password: ""
+  database: goclaw
+  diskSize: 10Gi
+  image:
+    repository:""
+    tag: "14"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 1Gi
+      cpu: 1000m
+
+workspace:
+  storage: 10Gi
+
+data:
+  storage: 5Gi
+
+ingress:
+  enabled: false
+  host: ""
+  class: gce
+
+secrets: {}
+
+configmap: {}
+
+backup:
+  enabled: true
+  schedule: "0 2 * * *"

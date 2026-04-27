@@ -1,0 +1,13 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'GOCLAW_VERSION=${_GOCLAW_VERSION}'
+      - '-t'
+      - '${_IMAGE}'
+      - 'docker/goclaw'
+    dir: '.'
+
+images:
+  - '${_IMAGE}'

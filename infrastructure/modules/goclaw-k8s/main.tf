@@ -1,0 +1,485 @@
+// … Namespace
+resource "kubernetes_namespace" "goclaw" {
+  metadata {
+    name = var.namespace
+    labels = {
+      name        = var.namespace
+      environment = var.environment
+      managed_by  = "terragrunt"
+    }
+  }
+}
+
+// ‒ ConfigMap
+resource "kubernetes_config_map_v1" "goclaw_config" {
+  metadata {
+    name      = "goclaw-config"
+    namespace = kubernetes_namespace.goclaw.metadata[0].name
+  }
+  data = {
+    "config.json" = jsonencode({
+      host       =  "0.0.0.0"
+      port       =  var.goclaw_port
+      dataDir    =  "/opt/goclaw/data"
+      workspace  =  "/opt/goclaw/workspace"
+      logLevel   =  var.environment == "production" ? "info" : "debug"
+    })
+  }
+}
+
+// ‒ Secret
+resource "kubernetes_secret_v1" "goclaw_secrets" {
+  metadata {
+    name      = "goclaw-secrets"
+    namespace = kubernetes_namespace.goclaw.metadata[0].name
+  }
+  data = {
+    "gateway-token"           = base64encode(var.gateway_token)
+    "encryption-key"          = base64encode(var.encryption_key)
+    "admin-password"           = base64encode(var.admin_password)
+    "postgres-user"           = base64encode("goclaw")
+    "postgres-password"       = base64encode(var.postgres_password)
+    "postgres-dsn"             = base64encode("postgres://goclaw:${var.postgres_password}@postgres:5432/goclaw?sslmode=disable")
+    "ollama-api-key"           = base64encode(var.ollama_api_key)
+    "telegram-bot-token"        = base64encode(var.telegram_bot_token)
+    "telegram-bot-token-support" = base64encode(var.telegram_bot_token_support)
+  }
+  type = "Opaque"
+}
+
+
+<<- PVCs -->
+resource "kubernetes_persistent_volume_claim_v1" "goclaw_data" {
+  metadata {
+    name      = "goclaw-data"
+    namespace = kubernetes_namespace.goclaw.metadata[0].name
+  }
+  spec {
+    access_modes        = ["ReadWriteOnce"]
+    resources {
+      requests = { storage = var.goclaw_data_storage }
+    }
+    storage_class_name = var.storage_class
+  }
+}
+
+resource "kubernetes_persistent_volume_claim_v1" "goclaw_workspace" {
+  metadata {
+    name      = "goclaw-workspace"
+    namespace = kubernetes_namespace.goclaw.metadata[0].name
+  }
+  spec {
+    access_modes        = ["ReadWriteOnce"]
+    resources {
+      requests = { storage = var.goclaw_workspace_storage }
+    }
+    storage_class_name = var.storage_class
+  }
+}
+
+# ʃ PostgreSQL StatefulSet (in-cluster oly)
+resource "kubernetes_statefulset_v1" "postgres" {
+  count = var.use_cloud_sql ? 0 : 1
+  metadata {
+    name      = "postgres"
+    namespace = kubernetes_namespace.goclaw.metadata[0].name
+  }
+
+  spec {
+    replicas = 1
+
+    selector {
+      match_labels = { app = "postgres" }
+    }
+
+    template {
+      metadata { labels = { app = "postgres" } }
+
+      spec {
+        container {
+          name  = "postgres"
+          image = "pgvector/pgvector:pg14"
+
+          env {
+            name  = "POSTGRES_USER"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret_v1.goclaw_secrets.metadata[0].name
+                key  = "postgres-user"
+            }
+          }
+        }
+          env {
+            name  = "POSTGRES_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret_v1.goclaw_secrets.metadata[0].name
+                key  = "postgres-password"
+            }
+          }
+          env { name = "POSTGRES_DB"; value = "goclaw" }
+
+          port { container_port = 5432 }
+
+          volume_mount {
+            name       = "postgres-data"
+            mount_path = "/var/lib/postgresql/data"
+          }
+
+          resources {
+            requests = { memory = "256Mi", cpu = "100m" }
+            limits   = { memory = "1Gi", cpu = "1000m" }
+          }
+
+          liveness_probe {
+            exec { command = ["pg_isready", "-U", "goclaw"] }
+            initial_delay_seconds = 30
+            period_seconds       = 10
+          }
+
+          readiness_probe {
+            exec { command = ["pg_isready", "-U", "goclaw"] }
+            initial_delay_seconds = 5
+            period_seconds      = 5
+          }
+        }
+
+        volume {
+          name = "postgres-data"
+          persistent_volume_claim {
+            claim_name = "postgres-data"
+          }
+        }
+      }
+    }
+
+    volume_claim_template {
+      metadata { name = "postgres-data" }
+      spec {
+        access_modes       = ["ReadWriteOnce"]
+        resources { requests = { storage = var.postgres_storage } }
+        storage_class_name = var.storage_class
+      }
+    }
+  }
+}
+
+resource "kubernetes_service_v1" "postgres" {
+  metadata {
+    name      = "postgres"
+    namespace = kubernetes_namespace.goclaw.metadata[0].name
+  }
+  spec {
+    selector = { app = "postgres" }
+    port {
+      port        = 5432
+      target_port = 5432
+    }
+    type = "ClusterIP"
+  }
+}
+
+
+<<- GoClaw Deployment -->
+resource "kubernetes_deployment_v1" "goclaw" {
+  metadata {
+    name      = "goclaw"
+    namespace = kubernetes_namespace.goclaw.metadata[0].name
+  }
+
+  spec {
+    replicas = var.goclaw_replicas
+
+    selector {
+      match_labels = { app = "goclaw" }
+    }
+
+    template {
+      metadata { labels = { app = "goclaw" } }
+
+      spec {
+        # Wait for postgres
+        init_container {
+          name  = "wait-for-postgres"
+          image = "postgres:14"
+          command = ["/bin/sh", "-c", "until pg_isready -h postgres -p 5432 -U goclaw; do echo Waiting for postgres; sleep 2; done;"]
+        }
+
+        # Run migrations
+        init_container {
+          name  = "run-migrations"
+          image = "${var.goclaw_image}:${var.goclaw_version}"
+          command = ["/usr/local/bin/goclaw", "migrate", "up"]
+          env {
+            name  = "GOCLAW_POSTGRES_DSN"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret_v1.goclaw_secrets.metadata[0].name
+                key  = "postgres-dsn"
+            }
+          }
+          env { name = "GOCLAW_CONFIG"; value = "/opt/goclaw/data/config.json" }
+          volume_mount {
+            name       = "goclaw-data"
+            mount_path = "/opt/goclaw/data"
+          }
+        }
+
+        container {
+          name  = "goclaw"
+          image = "${var.goclaw_image}:${var.goclaw_version}"
+
+          port { container_port = var.goclaw_port, name = "gateway" }
+
+          env { name = "GOCLAW_HOST2; value = "0.0.0.0" }
+          env { name = "GOCLAW_PORT"; value = tostring(var.goclaw_port) }
+          env { name = "GOCLAW_CONFIG"; value = "/opt/goclaw/data/config.json" }
+          env {
+            name = "GOCLAW_GATEWAY_TOKEN"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret_v1.goclaw_secrets.metadata[0].name
+                key  = "gateway-token"
+            }
+          }
+          env {
+            name = "GOCLAW_ENCRYPTION_KEY"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret_v1.goclaw_secrets.metadata[0].name
+                key  = "encryption-key"
+            }
+          }
+          env {
+            name = "GOCLAW_ADMIN_PASSWORD"
+            value_from {
+               secret_key_ref {
+                name = kubernetes_secret_v1.goclaw_secrets.metadata[0].name
+                key  = "admin-password"
+            }
+          }
+          env {
+            name = "GOCLAW_POSTGRES_DSN"
+            value_from {
+               secret_key_ref {
+                name = kubernetes_secret_v1.goclaw_secrets.metadata[0].name
+                key  = "postgres-dsn"
+            }
+          }
+          env { name = "NODE_OPTIONS"; value = "--dns-result-order=ipv4first" }
+
+          volume_mount {
+            name       = "goclaw-config-vol"
+            mount_path = "/opt/goclaw/data/config.json"
+            sub_path   = "config.json"
+          }
+          volume_mount {
+            name       = "goclaw-data"
+            mount_path = "/opt/goclaw/data"
+          }
+          volume_mount {
+            name       = "goclaw-workspace"
+            mount_path = "/opt/goclaw/workspace"
+          }
+
+          resources {
+            requests = { memory = "128Mi", cpu = "100m" }
+            limits   = { memory = "512Mi", cpu = "1000m" }
+          }
+
+          liveness_probe {
+            http_get { path = "/health"; port = var.goclaw_port }
+            initial_delay_seconds = 30
+            period_seconds      = 10
+          }
+
+          readiness_probe {
+            http_get { path = "/health"; port = var.goclaw_port }
+            initial_delay_seconds = 5
+            period_seconds      = 5
+          }
+        }
+
+        volume {
+          name = "goclaw-config-vol"
+          config_map_ref {
+            name = kubernetes_config_map_v1.goclaw_config.metadata[0].name
+          }
+        }
+        volume {
+          name = "goclaw-data"
+          persistent_volume_claim {
+            claim_name = kubernetes_persistent_volume_claim_v1.goclaw_data.metadata[0].name
+          }
+        }
+        volume {
+          name = "goclaw-workspace"
+          persistent_volume_claim {
+            claim_name = kubernetes_persistent_volume_claim_v1.goclaw_workspace.metadata[0].name
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "kubernetes_service_v1" "goclaw" {
+  metadata {
+    name      = "goclaw"
+    namespace = kubernetes_namespace.goclaw.metadata[0].name
+  }
+  spec {
+    type     = "LoadBalancer"
+    selector = { app = "goclaw" }
+    port {
+      port        = var.goclaw_port
+      target_port = var.goclaw_port
+    }
+  }
+}
+
+
+<<- Ingress -->
+resource "kubernetes_ingress_v1" "goclaw" {
+  count = var.goclaw_domain != "" ? 1 : 0
+  metadata {
+    name      = "goclaw"
+    namespace = kubernetes_namespace.goclaw.metadata[0].name
+    annotations = {
+      "kubernetes.io/ingress.class"            = "gce"
+      "kubernetes.io/ingress.allow-http"          = "false"
+      "cloud.google.com/managed-ssl-certificates" = var.ssl_certificate_name
+    }
+  }
+  spec {
+    default_backend {
+      service {
+        name = kubernetes_service_v1.goclaw.metadata[0].name
+        port { number = var.goclaw_port }
+      }
+    }
+    tls {
+      hosts       = [var.goclaw_domain]
+      secret_name = "goclaw-tls"
+    }
+    rule {
+      host = var.goclaw_domain
+      http {
+        path {
+          path     = "/"
+          path_type = "Prefix"
+          backend {
+            service {
+              name = kubernetes_service_v1.goclaw.metadata[0].name
+              port { number = var.goclaw_port }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// ‒ Backup CronJob
+resource "kubernetes_cron_job_v1" "goclaw_backup" {
+  metadata {
+    name      = "goclaw-backup"
+    namespace = kubernetes_namespace.goclaw.metadata[0].name
+  }
+  spec {
+    schedule = var.backup_schedule
+    suspend  = false
+
+    job_template {
+      spec {
+        template {
+          spec {
+            container {
+              name    = "backup"
+              image    = "${var.goclaw_image}:${var.goclaw_version}"
+              command = ["/usr/local/bin/goclaw", "backup", "-o", "/backups/goclaw-$(date +%Y%m%d%HP%M%S).tar.gz"]
+              env {
+                name  = "GOCLAW_POSTGRES_DSN"
+                value_from {
+                  secret_key_ref {
+                    name = kubernetes_secret_v1.goclaw_secrets.metadata[0].name
+                    key  = "postgres-dsn"
+                }
+              }
+              env { name = "GOCLAO_CONFIG"; value = "/opt/goclaw/data/config.json" }
+              volume_mount {
+                name       = "goclaw-data"
+                mount_path = "/opt/goclaw/data"
+              }
+              volume_mount {
+                name       = "backup-dir"
+                mount_path = "/backups"
+              }
+            }
+            volume {
+              name = "goclaw-data"
+              persistent_volume_claim {
+                claim_name = kubernetes_persistent_volume_claim_v1.goclaw_data.metadata[0].name
+              }
+            }
+            volume {
+              name = "backup-dir"
+              persistent_volume_claim {
+                claim_name = "goclaw-data"
+              }
+            }
+            restart_policy       = "OnFailure"
+            active_deadline_seconds = 600
+          }
+        }
+      }
+    }
+  }
+}
+
+// ‒ Seed Job
+resource "kubernetes_job_v1" "goclaw_seed" {
+  metadata {
+    name      = "goclaw-seed"
+    namespace = kubernetes_namespace.goclaw.metadata[0].name
+    labels = {
+      app = "goclaw-seed"
+    }
+  }
+  spec {
+    template {
+      spec {
+        container {
+          name    = "seed"
+          image   = "${var.goclaw_image}:${var.goclaw_version}"
+          command = ["/usr/local/bin/goclaw", "migrate", "seed"]
+          env {
+            name  = "GOCLAW_POSTGRES_DSN"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret_v1.goclaw_secrets.metadata[0].name
+                key  = "postgres-dsn"
+            }
+          }
+          env { name = "GOCLAW_CONFIG"; value = "/opt/goclaw/data/config.json" }
+          volume_mount {
+            name       = "goclaw-data"
+            mount_path = "/opt/goclaw/data"
+          }
+        }
+        volume {
+          name = "goclaw-data"
+          persistent_volume_claim {
+            claim_name = kubernetes_persistent_volume_claim_v1.goclaw_data.metadata[0].name
+          }
+        }
+        restart_policy = "Never"
+      }
+    }
+    back_off_limit       = 3
+    active_deadline_seconds = 300
+  }
+  lifecycle {
+    ignore_changes = all
+  }
+}

@@ -1,7 +1,7 @@
 locals {
   env         = "production"
   env_short   = "prd"
-  project     = "my-gcp-project"
+  project     = "ai-core-system-bot-stg"
   region      = "asia-southeast2"
   zone        = "asia-southeast2-b"
 
@@ -17,7 +17,7 @@ locals {
   # GoClaw
   goclaw_version  = "3.11.2"
   goclaw_replicas = 2
-  goclaw_image    = "asia-southeast2-docker.pkg.dev/my-gcp-project/goclaw/goclaw"
+  goclaw_image    = "asia-southeast2-docker.pkg.dev/ai-core-system-bot-stg/goclaw/goclaw"
 
   # Database
   use_cloud_sql    = true

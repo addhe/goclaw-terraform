@@ -4,9 +4,9 @@
 remote_state {
   backend = "gcs"
   config = {
-    project  = get_env("GOOGLE_PROJECT", "my-gcp-project")
+    project  = get_env("GOOGLE_PROJECT", "ai-core-system-bot-stg")
     location = get_env("GOOGLE_REGION", "asia-southeast2")
-    bucket   = "${get_env("GOOGLE_PROJECT", "my-gcp-project")}-terraform-state-${get_env("TF_VAR_env", "staging")}"
+    bucket   = "${get_env("GOOGLE_PROJECT", "ai-core-system-bot-stg")}-terraform-state-${get_env("TF_VAR_env", "staging")}"
     prefix   = "${path_relative_to_include()}/terraform.tfstate"
     gcs_bucket_labels = {
       managed_by = "terragrunt"
@@ -40,7 +40,7 @@ TFEOF
 }
 
 inputs = {
-  project     = get_env("GOOGLE_PROJECT", "my-gcp-project")
+  project     = get_env("GOOGLE_PROJECT", "ai-core-system-bot-stg")
   region      = get_env("GOOGLE_REGION", "asia-southeast2")
   zone        = get_env("GOOGLE_ZONE", "asia-southeast2-b")
   environment = get_env("TF_VAR_env", "staging")

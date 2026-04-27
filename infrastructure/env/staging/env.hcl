@@ -1,7 +1,7 @@
 locals {
   env         = "staging"
   env_short   = "stg"
-  project     = "my-gcp-project"
+  project     = "ai-core-system-bot-stg"
   region      = "asia-southeast2"
   zone        = "asia-southeast2-a"
 
@@ -15,12 +15,12 @@ locals {
   node_pool_preemptible   = true
 
   # GCS state bucket
-  state_bucket = "my-gcp-project-terraform-state-staging"
+  state_bucket = "ai-core-system-bot-stg-terraform-state-staging"
 
   # GoClaw
   goclaw_version  = "3.11.2"
   goclaw_replicas = 1
-  goclaw_image    = "asia-southeast2-docker.pkg.dev/my-gcp-project/goclaw/goclaw"
+  goclaw_image    = "asia-southeast2-docker.pkg.dev/ai-core-system-bot-stg/goclaw/goclaw"
 
   # Database
   use_cloud_sql    = false

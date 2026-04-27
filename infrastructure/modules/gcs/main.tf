@@ -3,14 +3,26 @@ resource "google_storage_bucket" "bucket" {
   project       = var.project
   location      = var.location
   force_destroy = var.force_destroy
-  versioning { enabled = var.versioning }
-  lifecycle_rule {
-    condition { age = var.lifecycle_age }
-    action { type = "SetStorageClass"; storage_class = "COLD" }
+  versioning {
+    enabled = var.versioning
   }
   lifecycle_rule {
-    condition { num_newer_versions = 10; with_state = "ANY" }
-    action { type = "Delete" }
+    condition {
+    age = var.lifecycle_age
+  }
+    action {
+    type          = "SetStorageClass"
+    storage_class = "COLD"
+  }
+  }
+  lifecycle_rule {
+    condition {
+    num_newer_versions = 10
+    with_state = "ANY"
+  }
+    action {
+    type = "Delete"
+  }
   }
   labels = var.labels
 }

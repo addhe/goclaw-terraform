@@ -32,9 +32,25 @@ terraform {
     kubectl = { source = "alekc/kubectl", version = "~> 2.0" }
   }
 }
-provider "google" { project = var.project; region = var.region; zone = var.zone }
-provider "kubernetes" { cluster_endpoint = module.gke.cluster_endpoint; token = data.google_client_config.current.access_token; cluster_ca_certificate = base64decode(module.gke.cluster_ca_certificate) }
-provider "kubectl" { cluster_endpoint = module.gke.cluster_endpoint; token = data.google_client_config.current.access_token; cluster_ca_certificate = base64decode(module.gke.cluster_ca_certificate); load_config_file = false }
+provider "google" {
+  project = var.project
+  region  = var.region
+  zone    = var.zone
+}
+
+provider "kubernetes" {
+  cluster_endpoint        = module.gke.cluster_endpoint
+  token                   = data.google_client_config.current.access_token
+  cluster_ca_certificate  = base64decode(module.gke.cluster_ca_certificate)
+}
+
+provider "kubectl" {
+  cluster_endpoint        = module.gke.cluster_endpoint
+  token                   = data.google_client_config.current.access_token
+  cluster_ca_certificate  = base64decode(module.gke.cluster_ca_certificate)
+  load_config_file        = false
+}
+
 data "google_client_config" "current" {}
 TFEOF
 }

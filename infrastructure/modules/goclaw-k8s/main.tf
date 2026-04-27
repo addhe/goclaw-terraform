@@ -117,7 +117,8 @@ resource "kubernetes_statefulset_v1" "postgres" {
                 key  = "postgres-password"
             }
           }
-          env { name = "POSTGRES_DB"; value = "goclaw" }
+          env { name = "POSTGRES_DB"
+             value = "goclaw" }
 
           port { container_port = 5432 }
 
@@ -218,7 +219,8 @@ resource "kubernetes_deployment_v1" "goclaw" {
                 key  = "postgres-dsn"
             }
           }
-          env { name = "GOCLAW_CONFIG"; value = "/opt/goclaw/data/config.json" }
+          env { name = "GOCLAW_CONFIG"
+             value = "/opt/goclaw/data/config.json" }
           volume_mount {
             name       = "goclaw-data"
             mount_path = "/opt/goclaw/data"
@@ -231,9 +233,12 @@ resource "kubernetes_deployment_v1" "goclaw" {
 
           port { container_port = var.goclaw_port, name = "gateway" }
 
-          env { name = "GOCLAW_HOST2; value = "0.0.0.0" }
-          env { name = "GOCLAW_PORT"; value = tostring(var.goclaw_port) }
-          env { name = "GOCLAW_CONFIG"; value = "/opt/goclaw/data/config.json" }
+          env { name = "GOCLAW_HOST2
+             value = "0.0.0.0" }
+          env { name = "GOCLAW_PORT"
+             value = tostring(var.goclaw_port) }
+          env { name = "GOCLAW_CONFIG"
+             value = "/opt/goclaw/data/config.json" }
           env {
             name = "GOCLAW_GATEWAY_TOKEN"
             value_from {
@@ -266,7 +271,8 @@ resource "kubernetes_deployment_v1" "goclaw" {
                 key  = "postgres-dsn"
             }
           }
-          env { name = "NODE_OPTIONS"; value = "--dns-result-order=ipv4first" }
+          env { name = "NODE_OPTIONS"
+             value = "--dns-result-order=ipv4first" }
 
           volume_mount {
             name       = "goclaw-config-vol"
@@ -288,13 +294,15 @@ resource "kubernetes_deployment_v1" "goclaw" {
           }
 
           liveness_probe {
-            http_get { path = "/health"; port = var.goclaw_port }
+            http_get { path = "/health"
+               port = var.goclaw_port }
             initial_delay_seconds = 30
             period_seconds      = 10
           }
 
           readiness_probe {
-            http_get { path = "/health"; port = var.goclaw_port }
+            http_get { path = "/health"
+               port = var.goclaw_port }
             initial_delay_seconds = 5
             period_seconds      = 5
           }
@@ -406,7 +414,8 @@ resource "kubernetes_cron_job_v1" "goclaw_backup" {
                     key  = "postgres-dsn"
                 }
               }
-              env { name = "GOCLAO_CONFIG"; value = "/opt/goclaw/data/config.json" }
+              env { name = "GOCLAO_CONFIG"
+                 value = "/opt/goclaw/data/config.json" }
               volume_mount {
                 name       = "goclaw-data"
                 mount_path = "/opt/goclaw/data"
@@ -461,7 +470,8 @@ resource "kubernetes_job_v1" "goclaw_seed" {
                 key  = "postgres-dsn"
             }
           }
-          env { name = "GOCLAW_CONFIG"; value = "/opt/goclaw/data/config.json" }
+          env { name = "GOCLAW_CONFIG"
+             value = "/opt/goclaw/data/config.json" }
           volume_mount {
             name       = "goclaw-data"
             mount_path = "/opt/goclaw/data"

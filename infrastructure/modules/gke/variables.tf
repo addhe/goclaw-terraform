@@ -28,6 +28,7 @@ variable "service_account" {
 variable "tags" {
   type = map(string)
   default = {}
+}
 variable "enable_autopilot" {
   type = bool
   default = false

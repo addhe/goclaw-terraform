@@ -14,6 +14,7 @@ variable "environment" {
 variable "labels" {
   type = map(string)
   default = {}
+}
 variable "reader_members" {
   type = list(string)
   default = []

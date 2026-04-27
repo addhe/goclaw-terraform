@@ -1,6 +1,6 @@
 resource "google_container_cluster" "goclaw" {
   name     = var.cluster_name
-  location = var.region
+  location = var.zone
   project  = var.project
   network    = var.network
   subnetwork = var.subnetwork
@@ -45,7 +45,7 @@ resource "google_container_node_pool" "default" {
   name       = "default-pool"
   cluster    = google_container_cluster.goclaw.name
   project    = var.project
-  location   = var.region
+  location   = var.zone
 
   initial_node_count = var.node_pool_min_count
 

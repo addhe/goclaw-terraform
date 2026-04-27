@@ -38,16 +38,23 @@ provider "google" {
   zone    = var.zone
 }
 
+
+data "google_container_cluster" "goclaw" {
+  name     = "goclaw-stg"
+  location = "asia-southeast2-a"
+  project  = var.project
+}
+
 provider "kubernetes" {
-  cluster_endpoint        = module.gke.cluster_endpoint
-  token                   = data.google_client_config.current.access_token
-  cluster_ca_certificate  = base64decode(module.gke.cluster_ca_certificate)
+  host = "https://${data.google_container_cluster.goclaw.endpoint}"
+  token                  = data.google_client_config.current.access_token
+  cluster_ca_certificate  = base64decode(data.google_container_cluster.goclaw.master_auth[0].cluster_ca_certificate)
 }
 
 provider "kubectl" {
-  cluster_endpoint        = module.gke.cluster_endpoint
-  token                   = data.google_client_config.current.access_token
-  cluster_ca_certificate  = base64decode(module.gke.cluster_ca_certificate)
+  host = "https://${data.google_container_cluster.goclaw.endpoint}"
+  token                  = data.google_client_config.current.access_token
+  cluster_ca_certificate  = base64decode(data.google_container_cluster.goclaw.master_auth[0].cluster_ca_certificate)
   load_config_file        = false
 }
 
@@ -58,6 +65,6 @@ TFEOF
 inputs = {
   project     = get_env("GOOGLE_PROJECT", "ai-core-system-bot-stg")
   region      = get_env("GOOGLE_REGION", "asia-southeast2")
-  zone        = get_env("GOOGLE_ZONE", "asia-southeast2-b")
+  zone        = get_env("GOOGLE_ZONE", "asia-southeast2-a")
   environment = get_env("TF_VAR_env", "staging")
 }

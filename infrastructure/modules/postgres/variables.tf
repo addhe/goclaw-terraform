@@ -28,7 +28,8 @@ variable "postgres_user" {
   default = "goclaw"
 }
 variable "postgres_password" {
-  type = string, sensitive = true
+  type = string
+  sensitive = true
 }
 variable "postgres_db" {
   type = string

@@ -51,7 +51,7 @@ variable "node_pool_preemptible" {
 }
 variable "node_pool_disk_size_gb" {
   type = number
-  default = 50
+  default = 30
 }
 variable "node_pool_disk_type" {
   type = string

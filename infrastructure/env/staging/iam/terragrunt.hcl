@@ -1,14 +1,19 @@
 include "root" {
-  path   = find_in_parent_folders("infrastructure/terragrunt.hcl")
-  expose = true
+  path = find_in_parent_folders()
 }
 
 terraform {
-  source = "${dirname(find_in_parent_folders("infrastructure/terragrunt.hcl"))}//modules/iam"
+  source = "../../../../modules/iam"
 }
 
 locals {
-  env = read_terragrunt_config("${dirname(find_in_parent_folders("infrastructure/terragrunt.hcl"))}/env/staging/env.hcl").locals
+  env = read_terragrunt_config("../../env.hcl").locals
 }
 
-inputs = merge(local.env, {})
+inputs = {
+  project           = local.env.project
+  environment       = local.env.env
+  node_sa_name      = "gke-node-sa"
+  workload_sa_name  = "goclaw-workload-sa"
+  backup_buckets    = [local.env.backup_bucket]
+}

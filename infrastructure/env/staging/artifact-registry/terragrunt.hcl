@@ -1,14 +1,21 @@
 include "root" {
-  path   = find_in_parent_folders("infrastructure/terragrunt.hcl")
-  expose = true
+  path = find_in_parent_folders()
 }
 
 terraform {
-  source = "${dirname(find_in_parent_folders("infrastructure/terragrunt.hcl"))}//modules/artifact-registry"
+  source = "../../../../modules/artifact-registry"
 }
 
 locals {
-  env = read_terragrunt_config("${dirname(find_in_parent_folders("infrastructure/terragrunt.hcl"))}/env/staging/env.hcl").locals
+  env = read_terragrunt_config("../../env.hcl").locals
 }
 
-inputs = merge(local.env, {})
+inputs = {
+  project         = local.env.project
+  location        = local.env.region
+  repository_name = "goclaw"
+  environment     = local.env.env
+  labels          = local.env.tags
+  reader_members  = []
+  writer_members  = ["serviceAccount:gke-deploy-admin@${local.env.project}.iam.gserviceaccount.com"]
+}

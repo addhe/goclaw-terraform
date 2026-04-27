@@ -1,14 +1,19 @@
 include "root" {
-  path   = find_in_parent_folders("infrastructure/terragrunt.hcl")
-  expose = true
+  path = find_in_parent_folders()
 }
 
 terraform {
-  source = "${dirname(find_in_parent_folders("infrastructure/terragrunt.hcl"))}//modules/postgres"
+  source = "../../../../modules/postgres"
 }
 
 locals {
-  env = read_terragrunt_config("${dirname(find_in_parent_folders("infrastructure/terragrunt.hcl"))}/env/staging/env.hcl").locals
+  env = read_terragrunt_config("../../env.hcl").locals
 }
 
-inputs = merge(local.env, {})
+inputs = {
+  project           = local.env.project
+  region            = local.env.region
+  environment       = local.env.env
+  use_cloud_sql     = local.env.use_cloud_sql
+  postgres_password = get_env("GOCLAW_POSTGRES_PASSWORD_STG", "changeme")
+}

@@ -1,0 +1,62 @@
+# GoClaw Cloud Build Configuration
+# Builds Docker image and pushes to Artifact Registry
+# Triggered on push to main branch when goclaw source changes
+
+substitutions:
+  _GOCLAW_VERSION: 'v3.11.2'
+  _REGION: 'asia-southeast2'
+  _REPO: 'goclaw'
+  _IMAGE: 'asia-southeast2-docker.pkg.dev/${PROJECT_ID}/${_REPO}/goclaw:${SHORT_SHA}'
+  _IMAGE_LATEST: 'asia-southeast2-docker.pkg.dev/${PROJECT_ID}/${_REPO}/goclaw:latest'
+  _IMAGE_VERSION: 'asia-southeast2-docker.pkg.dev/${PROJECT_ID}/${_REPO}/goclaw:${_GOCLAW_VERSION}'
+
+steps:
+  # Step 1: Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'GOCLAW_VERSION=${_GOCLAW_VERSION}'
+      - '-t'
+      - '${_IMAGE}'
+      - '-t'
+      - '${_IMAGE_LATEST}'
+      - '-t'
+      - '${_IMAGE_VERSION}'
+      - '-f'
+      - 'docker/goclaw/Dockerfile'
+      - '.'
+    id: 'build-image'
+    timeout: '600s'
+
+  # Step 2: Push all tags to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '--all-tags', 'asia-southeast2-docker.pkg.dev/${PROJECT_ID}/${_REPO}/goclaw']
+    id: 'push-image'
+    timeout: '300s'
+    waitFor: ['build-image']
+
+  # Step 3: Verify image is accessible
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'images'
+      - 'list'
+      - '--filter'
+      - 'reference:${_IMAGE}'
+    id: 'verify-image'
+    waitFor: ['push-image']
+
+# Push images
+images:
+  - '${_IMAGE}'
+  - '${_IMAGE_LATEST}'
+  - '${_IMAGE_VERSION}'
+
+# Build options
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+  diskSizeGb: 100
+
+# Build timeout
+timeout: '1200s'
